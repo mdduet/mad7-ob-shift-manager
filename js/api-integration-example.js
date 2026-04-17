@@ -10,18 +10,32 @@
  */
 
 // Initialize API Service with Packman configuration
-const packmanAPI = new PackmanAPIService({
-  baseUrl: 'https://insights.prod-eu.pack.aft.a2z.com/packman',
-  oauthUrl: 'https://midway-auth.amazon.com/SSO/redirect',
-  facilityCode: 'MAD7',
-  timeout: 30000
-});
+let packmanAPI;
+
+// Ensure PackmanAPIService is available before creating instance
+if (typeof PackmanAPIService === 'undefined') {
+  console.error('❌ PackmanAPIService not loaded - check that api-service.js is loaded first');
+} else {
+  packmanAPI = new PackmanAPIService({
+    baseUrl: 'https://insights.prod-eu.pack.aft.a2z.com/packman',
+    oauthUrl: 'https://midway-auth.amazon.com/SSO/redirect',
+    facilityCode: 'MAD7',
+    timeout: 30000
+  });
+  console.log('✅ PackmanAPIService instance created');
+}
 
 /**
  * Example 1: Initialize API and authenticate
  */
 async function initializePackman() {
   console.log('📡 Initializing Packman API...');
+  
+  // Check if packmanAPI is available
+  if (!packmanAPI) {
+    console.error('❌ PackmanAPIService not initialized');
+    return false;
+  }
   
   // Check if already authenticated
   if (packmanAPI.isAuthenticated) {
@@ -35,12 +49,34 @@ async function initializePackman() {
   
   if (success) {
     console.log('✅ Packman authentication successful');
+    console.log('💡 Try: fetchFloorData() or fetchWorkerProfile("your-login")');
     // Now you can fetch data
     return true;
   } else {
     console.error('❌ Packman authentication failed');
     // Fallback to mock/local data
+    console.log('💡 Using fallback test mode - try: getMockFloorData()');
     return false;
+  }
+}
+
+/**
+ * Quick test function - shows if API is working
+ */
+async function testPackmanAPI() {
+  console.log('🧪 Testing Packman API integration...\n');
+  
+  // Initialize
+  await initializePackman();
+  
+  // Test fetch
+  console.log('\n📊 Fetching test data...');
+  const data = await fetchFloorData();
+  
+  if (data) {
+    console.log('✅ API is working! Data received:', data);
+  } else {
+    console.error('❌ API test failed');
   }
 }
 
@@ -179,22 +215,29 @@ function getMockFloorData() {
   };
 }
 
-/**
- * Usage in your application:
- * 
- * When component loads:
- * - Call initializePackman()
- * - Try fetching from API
- * - Fallback to mock data if authentication fails
- * 
- * Update current queries like:
- * OLD: parseFloor() using hardcoded data
- * NEW: 
- *   const data = await fetchFloorData();
- *   parseFloor(data);
- */
+// ══════════════════════════════════════════════════════════
+// EXPOSE ALL API FUNCTIONS TO WINDOW (GLOBAL SCOPE)
+// ══════════════════════════════════════════════════════════
+window.packmanAPI = packmanAPI;
+window.initializePackman = initializePackman;
+window.testPackmanAPI = testPackmanAPI;
+window.fetchFloorData = fetchFloorData;
+window.fetchWorkerProfile = fetchWorkerProfile;
+window.fetchSchedule = fetchSchedule;
+window.fetchProcessMetrics = fetchProcessMetrics;
+window.getMockFloorData = getMockFloorData;
 
-// Example: Auto-initialize when page loads
+// ✅ Display available commands in console on load
+console.log('%c✅ Packman API integration loaded!', 'color: green; font-weight: bold;');
+console.log('%cAvailable commands:', 'color: blue; font-weight: bold;');
+console.log('  • initializePackman() - Initialize and authenticate');
+console.log('  • testPackmanAPI() - Run full API test');
+console.log('  • fetchFloorData() - Get floor data');
+console.log('  • fetchWorkerProfile("login") - Get worker info');
+console.log('  • getMockFloorData() - Get test data');
+console.log('  • packmanAPI.getStatus() - Check API status');
+
+// Auto-initialize when page loads
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('🚀 Initializing MAD7 with API integration...');
   

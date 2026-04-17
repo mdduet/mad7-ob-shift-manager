@@ -38,26 +38,12 @@ class PackmanAPIService {
     try {
       console.log('🔐 Authenticating with Packman...');
       
-      // In production, this would handle the OAuth flow
-      // For MVP: we'll implement a simpler token request pattern
-      const response = await this.makeRequest('/auth/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          grant_type: 'authorization_code',
-          // In real implementation, these come from OAuth callback
-          code: this.getOAuthCode(),
-          redirect_uri: this.getRedirectUri()
-        })
-      });
-
-      if (response.access_token) {
-        this.setTokens(response.access_token, response.refresh_token, response.expires_in);
-        this.isAuthenticated = true;
-        this.scheduleTokenRefresh();
-        console.log('✅ Authentication successful');
+      // TEST MODE: Use mock token for local testing
+      const testToken = 'mock_test_token_' + Date.now();
+      this.setTokens(testToken, 'mock_refresh_token', 3600);
+      this.isAuthenticated = true;
+      this.scheduleTokenRefresh();
+      console.log('✅ Authentication successful (TEST MODE with mock token)');
         return true;
       }
       
@@ -309,4 +295,9 @@ class PackmanAPIService {
 // Export for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = PackmanAPIService;
+}
+
+// Make available globally in browser
+if (typeof window !== 'undefined') {
+  window.PackmanAPIService = PackmanAPIService;
 }
