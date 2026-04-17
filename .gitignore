@@ -1,0 +1,21 @@
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (if we ever add it)
+node_modules/
+npm-debug.log
+
+# Local development
+*.local.json
+.env
+
+# Browser cache/storage exports
+*.session
