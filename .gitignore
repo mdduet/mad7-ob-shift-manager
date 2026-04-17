@@ -13,9 +13,21 @@ Thumbs.db
 node_modules/
 npm-debug.log
 
+# Environment & Secrets (NEVER commit!)
+.env
+.env.local
+.env.*.local
+.env.production.local
+.env.test.local
+
 # Local development
 *.local.json
-.env
+secrets.json
 
 # Browser cache/storage exports
 *.session
+
+# Build outputs (if we add build process)
+dist/
+build/
+*.log
