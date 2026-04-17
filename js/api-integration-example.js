@@ -9,20 +9,24 @@
  *    <script src="js/api-integration-example.js"></script>
  */
 
-// Initialize API Service with Packman configuration
-let packmanAPI;
+// Initialize API Service with Packman configuration (lazy)
+let packmanAPI = null;
 
-// Ensure PackmanAPIService is available before creating instance
-if (typeof PackmanAPIService === 'undefined') {
-  console.error('❌ PackmanAPIService not loaded - check that api-service.js is loaded first');
-} else {
-  packmanAPI = new PackmanAPIService({
-    baseUrl: 'https://insights.prod-eu.pack.aft.a2z.com/packman',
-    oauthUrl: 'https://midway-auth.amazon.com/SSO/redirect',
-    facilityCode: 'MAD7',
-    timeout: 30000
-  });
-  console.log('✅ PackmanAPIService instance created');
+function getPackmanAPI() {
+  if (!packmanAPI) {
+    if (typeof PackmanAPIService === 'undefined') {
+      console.error('❌ PackmanAPIService not loaded - check that api-service.js is loaded first');
+      return null;
+    }
+    packmanAPI = new PackmanAPIService({
+      baseUrl: 'https://insights.prod-eu.pack.aft.a2z.com/packman',
+      oauthUrl: 'https://midway-auth.amazon.com/SSO/redirect',
+      facilityCode: 'MAD7',
+      timeout: 30000
+    });
+    console.log('✅ PackmanAPIService instance created');
+  }
+  return packmanAPI;
 }
 
 /**
@@ -31,21 +35,22 @@ if (typeof PackmanAPIService === 'undefined') {
 async function initializePackman() {
   console.log('📡 Initializing Packman API...');
   
-  // Check if packmanAPI is available
-  if (!packmanAPI) {
-    console.error('❌ PackmanAPIService not initialized');
+  // Get or create packmanAPI instance
+  const api = getPackmanAPI();
+  if (!api) {
+    console.error('❌ PackmanAPIService not available');
     return false;
   }
   
   // Check if already authenticated
-  if (packmanAPI.isAuthenticated) {
+  if (api.isAuthenticated) {
     console.log('✅ Already authenticated with Packman');
-    console.log('Status:', packmanAPI.getStatus());
+    console.log('Status:', api.getStatus());
     return true;
   }
 
   // Attempt authentication
-  const success = await packmanAPI.authenticate();
+  const success = await api.authenticate();
   
   if (success) {
     console.log('✅ Packman authentication successful');
@@ -87,7 +92,13 @@ async function fetchFloorData() {
   try {
     console.log('📊 Fetching floor data from Packman...');
     
-    const data = await packmanAPI.getRecentFloorData({
+    const api = getPackmanAPI();
+    if (!api) {
+      console.error('❌ Packman API not available');
+      return getMockFloorData();
+    }
+    
+    const data = await api.getRecentFloorData({
       facilityCode: 'MAD7',
       limit: 500
     });
@@ -109,7 +120,13 @@ async function fetchWorkerProfile(login) {
   try {
     console.log(`👤 Fetching profile for ${login}...`);
     
-    const profile = await packmanAPI.getWorkerProfile(login);
+    const api = getPackmanAPI();
+    if (!api) {
+      console.error('❌ Packman API not available');
+      return null;
+    }
+    
+    const profile = await api.getWorkerProfile(login);
     
     console.log('✅ Worker profile received:', profile);
     return profile;
@@ -127,7 +144,13 @@ async function fetchSchedule(startDate, endDate) {
   try {
     console.log(`📅 Fetching schedule from ${startDate} to ${endDate}...`);
     
-    const schedule = await packmanAPI.getShiftSchedule({
+    const api = getPackmanAPI();
+    if (!api) {
+      console.error('❌ Packman API not available');
+      return [];
+    }
+    
+    const schedule = await api.getShiftSchedule({
       facilityCode: 'MAD7',
       startDate,
       endDate
@@ -149,7 +172,13 @@ async function fetchProcessMetrics(processId, timeRange = '1h') {
   try {
     console.log(`📈 Fetching metrics for ${processId}...`);
     
-    const metrics = await packmanAPI.getProcessMetrics(processId, {
+    const api = getPackmanAPI();
+    if (!api) {
+      console.error('❌ Packman API not available');
+      return null;
+    }
+    
+    const metrics = await api.getProcessMetrics(processId, {
       timeRange,
       facilityCode: 'MAD7'
     });
@@ -218,7 +247,7 @@ function getMockFloorData() {
 // ══════════════════════════════════════════════════════════
 // EXPOSE ALL API FUNCTIONS TO WINDOW (GLOBAL SCOPE)
 // ══════════════════════════════════════════════════════════
-window.packmanAPI = packmanAPI;
+window.getPackmanAPI = getPackmanAPI;
 window.initializePackman = initializePackman;
 window.testPackmanAPI = testPackmanAPI;
 window.fetchFloorData = fetchFloorData;
