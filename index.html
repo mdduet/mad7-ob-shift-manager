@@ -1544,11 +1544,11 @@ body.nav-compact .ntab{height:38px;font-size:11px;padding:0 10px}
     <tbody id="q1-pick-body"></tbody>
   </table>
 
-  <!-- Split + Extra -->
+  <!-- Split -->
   <div style="margin-top:3px;font-size:10px;display:flex;gap:8px;flex-wrap:wrap">
     <div>Singles: <span id="q1-split-singles" style="font-weight:700;color:var(--blue)">—%</span></div>
     <div>Multis: <span id="q1-split-multis" style="font-weight:700;color:var(--amber)">—%</span></div>
-    <div style="margin-left:auto">Extra Pick: <span id="q1-extra-pick" style="font-weight:700;color:var(--green)">—</span></div>
+    <span id="q1-extra-pick" style="display:none"></span>
   </div>
 
   <!-- System text -->
@@ -1583,6 +1583,7 @@ body.nav-compact .ntab{height:38px;font-size:11px;padding:0 10px}
         <th style="padding:2px 4px;border:1px solid #bbb;text-align:left">PP</th>
         <th style="padding:2px 3px;border:1px solid #bbb;text-align:center">Min limit</th>
         <th style="padding:2px 3px;border:1px solid #bbb;text-align:center">Max limit</th>
+        <th style="padding:2px 3px;border:1px solid #bbb;text-align:center">HC Needed</th>
       </tr></thead>
       <tbody id="q1-buf-body"></tbody>
     </table>
@@ -1788,10 +1789,9 @@ body.nav-compact .ntab{height:38px;font-size:11px;padding:0 10px}
           <td id="buf-next-units" style="padding:2px 3px;border:1px solid #bbb;text-align:center;font-family:monospace;font-size:10px">—</td>
           <td id="buf-next-ships" style="padding:2px 3px;border:1px solid #bbb;text-align:center;font-family:monospace;font-size:10px">—</td>
         </tr>
-        <tr style="background:rgba(244,63,94,.08)">
-          <td style="padding:2px 4px;border:1px solid #bbb;font-size:9px;font-weight:700;color:var(--red)">Needed pickers</td>
-          <td id="needed-pickers-units" style="padding:2px 3px;border:1px solid #bbb;text-align:center;font-family:monospace;font-size:10px;font-weight:700;color:var(--red)">—</td>
-          <td id="needed-pickers-ships" style="padding:2px 3px;border:1px solid #bbb;text-align:center;font-family:monospace;font-size:10px;font-weight:700;color:var(--red)">—</td>
+        <tr style="display:none">
+          <td id="needed-pickers-units"></td>
+          <td id="needed-pickers-ships"></td>
         </tr>
       </tbody>
     </table>
@@ -2889,6 +2889,11 @@ function parsePackman(raw){
 }
 
 function buildFloorTabs(){
+  if (typeof FLOOR_DEFS === 'undefined') {
+    console.warn('⚠️ FLOOR_DEFS not defined yet; skipping floor tab build.');
+    return;
+  }
+
   const el=document.getElementById('floor-tabs');el.innerHTML='';
   ['P1','P2','P3','P4'].forEach(f=>{
     const lines=FLOOR_DEFS[f]||[];
@@ -2907,7 +2912,7 @@ function buildFloorTabs(){
 }
 
 function updateHCFamilyBar(){
-  if(!S.floorWorkers) return;
+  if(!S.floorWorkers || typeof FLOOR_DEFS === 'undefined') return;
   // Define which line IDs belong to each family (updated for new process paths)
   const families = {
     afe:   ['AFE1','AFE2','AFE3','AFE4'],
@@ -2938,7 +2943,11 @@ function updateHCFamilyBar(){
   });
 }
 
-function renderFloor(){buildFloorTabs();renderFloorContent();renderTicketsBanner();}
+function renderFloor(){
+  buildFloorTabs();
+  renderFloorContent();
+  renderTicketsBanner();
+}
 
 function renderFloorContent(){
   const ct=document.getElementById('floor-content');
@@ -2946,7 +2955,22 @@ function renderFloorContent(){
     ct.innerHTML=`<div class="empty"><div class="empty-icon">🏭</div><p>Paste Packman data on the Import page to populate the floor map automatically.</p><button class="btn primary" onclick="goPage('import')" style="font-size:12px;padding:8px 18px">Go to Import ↗</button></div>`;
     return;
   }
-  const lines=FLOOR_DEFS[S.floorFloor]||[];
+
+  if (typeof FLOOR_DEFS === 'undefined') {
+    const rows = Object.values(S.floorWorkers).map(worker => {
+      return `<div class="floor-slot" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.06);">` +
+             `<div><strong>${worker.station}</strong><div style="font-size:11px;color:var(--text3);margin-top:2px">${worker.login} • ${worker.task||'no task'}</div></div>` +
+             `<div style="font-size:11px;color:var(--text2);">${worker.process||'no process'}</div>` +
+             `</div>`;
+    }).join('');
+
+    ct.innerHTML = `<div class="empty"><div class="empty-icon">🔎</div><p>Live floor layout data is unavailable, showing raw worker stations instead.</p></div>` +
+                   `<div style="margin-top:18px;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;background:var(--bg3);">${rows}</div>`;
+    document.getElementById('floor-meta').textContent = `${Object.keys(S.floorWorkers).length} active stations`;    
+    return;
+  }
+
+  const lines=(FLOOR_DEFS[S.floorFloor]||[]);
   const total=lines.reduce((s,l)=>{
     const sts=l.walls?l.walls.flatMap(w=>w.stations):(l.stations||[]);
     return s+sts.filter(st=>S.floorWorkers[st.sid]).length;
@@ -8601,6 +8625,14 @@ const PLAN = {
   arRate:350, currentAR:40, q2currentAR:25, q2arRate:340,
   tp:5700,
   packSupport:1943, pickSupport:5837, ps:2753, lead:2783,
+  bufLimits: [
+    {id:'afe',  lbl:'AFE',       rate:1000, min:230, max:291},
+    {id:'sm',   lbl:'SM',        rate:120,  min:60,  max:71},
+    {id:'siobc',lbl:'SIOBC',     rate:230,  min:101, max:132},
+    {id:'sns2', lbl:'SNS2',      rate:250,  min:152, max:182},
+    {id:'sns1', lbl:'SNS1',      rate:400,  min:377, max:453},
+    {id:'nosl', lbl:'NoSLAMMix', rate:200,  min:98,  max:117},
+  ],
 };
 
 // Derived calculations (mirror the Excel formulas exactly)
@@ -8871,8 +8903,9 @@ function renderPlan() {
   sv('plan-uph-badge', fN(q1GrandTUR));
 
   // Pick Capa
+  const arPlanRate  = PLAN.arRate || 350;
   const q1PickTUR   = q1AR * 350;
-  const q1PickPlan  = q1ARP * 350;
+  const q1PickPlan  = q1ARP * arPlanRate;
   const q1ExtraPick = q1PickTUR - q1GrandTUR;
   const singlesPct  = q1GrandTUR ? q1TotTUR/q1GrandTUR : 0;
   const multisPct   = q1GrandTUR ? q1P2RTotTUR/q1GrandTUR : 0;
@@ -8890,22 +8923,21 @@ function renderPlan() {
     const rcM = riskCol(pctBlMultis, true);
     const rcT = riskCol(pctTURPick, true);
     pickBody.innerHTML = `
-      <tr style="background:#fff">
-        <td style="padding:2px 4px;border:1px solid #ddd;font-size:9px;color:#666">AR for plan</td>
-        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px">${fD(q1ARP,1)}</td>
-        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px">350</td>
-        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:10px">${fN(q1PickPlan)}</td>
-        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px;background:${typeof rcS==='object'?rcS.bg:rcS};color:${typeof rcS==='object'?rcS.col:'inherit'}">Singles ${fPct(singlesPct)}</td>
-        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px;background:${typeof rcM==='object'?rcM.bg:rcM};color:${typeof rcM==='object'?rcM.col:'inherit'}">Multis ${fPct(multisPct)}</td>
-        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px;background:${typeof rcT==='object'?rcT.bg:rcT};color:${typeof rcT==='object'?rcT.col:'inherit'}">${fPct(pctTURPick)}</td>
-      </tr>
       <tr style="background:#d4edda">
         <td style="padding:2px 4px;border:1px solid #ddd;font-size:9px;font-weight:700;color:#155724">Current AR</td>
         <td style="padding:1px 2px;border:1px solid #ddd;text-align:center;font-size:10px;font-weight:700;color:#155724">${q1AR}</td>
         <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px">350</td>
         <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:10px;font-weight:700">${fN(q1PickTUR)}</td>
-        <td colspan="2" style="border:1px solid #ddd;padding:2px 3px;text-align:center;font-size:9px;color:#155724">Extra Pick Capa: <b>${(q1ExtraPick>=0?'+':'')+fN(q1ExtraPick)}</b></td>
-        <td style="border:1px solid #ddd"></td>
+        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px;background:${typeof rcS==='object'?rcS.bg:rcS};color:${typeof rcS==='object'?rcS.col:'inherit'}">Singles ${fPct(singlesPct)}</td>
+        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px;background:${typeof rcM==='object'?rcM.bg:rcM};color:${typeof rcM==='object'?rcM.col:'inherit'}">Multis ${fPct(multisPct)}</td>
+        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-size:10px;background:${typeof rcT==='object'?rcT.bg:rcT};color:${typeof rcT==='object'?rcT.col:'inherit'}">${fPct(pctTURPick)}</td>
+      </tr>
+      <tr style="background:#fff">
+        <td style="padding:2px 4px;border:1px solid #ddd;font-size:9px;color:#666">AR for plan</td>
+        <td style="padding:1px 2px;border:1px solid #ddd;text-align:center;background:#fff3cd">${inp(q1ARP, "document.getElementById('q1-ar-plan').value=this.value;renderPlan()", 28, '#856404')}</td>
+        <td style="padding:1px 2px;border:1px solid #ddd;text-align:center;background:#e8f4fd">${inp(arPlanRate, "PLAN.arRate=parseInt(this.value)||350;renderPlan()", 34, '#1a5a9a')}</td>
+        <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:10px">${fN(q1PickPlan)}</td>
+        <td colspan="3" style="border:1px solid #ddd"></td>
       </tr>`;
   }
 
@@ -8920,18 +8952,15 @@ function renderPlan() {
 
   // Buffer table Q1
   const bufBody = document.getElementById('q1-buf-body');
-  if(bufBody) bufBody.innerHTML = [
-    {lbl:'PPAFE1',      min:230, max:291},
-    {lbl:'PPSingleMed', min:60,  max:71},
-    {lbl:'PPSingleSIOBC',min:101,max:132},
-    {lbl:'PPSingleNS2', min:152, max:182},
-    {lbl:'PPSingleNS1', min:377, max:453},
-    {lbl:'PPSingleNSM', min:98,  max:117},
-  ].map(b=>`<tr style="background:#fff">
-    <td style="padding:2px 4px;border:1px solid #ddd;font-size:10px">${b.lbl}</td>
-    <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:10px">${b.min}</td>
-    <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-family:monospace;font-size:10px">${b.max}</td>
-  </tr>`).join('');
+  if(bufBody) bufBody.innerHTML = PLAN.bufLimits.map(b => {
+    const hcNeeded = b.rate > 0 ? Math.ceil(b.min / (b.rate * (tiempo / 60))) : '—';
+    return `<tr style="background:#fff">
+      <td style="padding:2px 4px;border:1px solid #ddd;font-size:10px;font-weight:600">${b.lbl}</td>
+      <td style="padding:1px 2px;border:1px solid #ddd;text-align:center;background:#dce6f1">${inp(b.min, \`PLAN.bufLimits.find(x=>x.id==='${b.id}').min=parseInt(this.value)||0;renderPlan()\`, 38, '#1a5a9a')}</td>
+      <td style="padding:1px 2px;border:1px solid #ddd;text-align:center;background:#d5e8d4">${inp(b.max, \`PLAN.bufLimits.find(x=>x.id==='${b.id}').max=parseInt(this.value)||0;renderPlan()\`, 38, '#1a7a4a')}</td>
+      <td style="padding:2px 3px;border:1px solid #ddd;text-align:center;font-weight:700;color:#c0392b;font-family:monospace;font-size:10px">${hcNeeded}</td>
+    </tr>`;
+  }).join('');
 
   // Process rates panel
   const ratesEl = document.getElementById('q1-process-rates');
@@ -9036,7 +9065,7 @@ function renderPlan() {
   const q2SM =PLAN.q2p1.filter(p=>p.group==='sm').reduce((s,p)=>s+p.hc,0);
   const q2SNS=PLAN.q2p1.filter(p=>p.group==='sns').reduce((s,p)=>s+p.hc,0);
   const q2P2Rw=PLAN.q2p2r.map(p=>`${p.walls}/${p.packers}`).join('-');
-  sv('q2-plan-text', `AFE ${q2AFE}/${q1AFE}-SM: ${q2SM}/${q1SM}-SNS ${q2SNS}/${q1SNS}\nSR: 0\nP2R ${q2P2Rw}\nAR ${Math.round(q2AR)}\nExtra Pick Capa ${fN(q2AR*340-q2GrandTUR)}`);
+  sv('q2-plan-text', `AFE ${q2AFE}/${q1AFE}-SM: ${q2SM}/${q1SM}-SNS ${q2SNS}/${q1SNS}\nSR: 0\nP2R ${q2P2Rw}\nAR ${Math.round(q2AR)}`);
 
   // ── CPT Risk table ─────────────────────────────────────────
   const cptBody = document.getElementById('cpt-risk-body');
@@ -9121,7 +9150,7 @@ function savePlan() {
       p1:PLAN.p1, p2r:PLAN.p2r, q2p1:PLAN.q2p1, q2p2r:PLAN.q2p2r,
       rodeo:PLAN.rodeo, rates:PLAN.rates,
       arRate:PLAN.arRate, currentAR:PLAN.currentAR, q2currentAR:PLAN.q2currentAR,
-      q2arRate:PLAN.q2arRate||340, tp:PLAN.tp
+      q2arRate:PLAN.q2arRate||340, tp:PLAN.tp, bufLimits:PLAN.bufLimits
     }));
     toast('Plan saved ✓');
   } catch(e) { toast('Save failed'); }
@@ -9143,6 +9172,7 @@ function loadSavedPlan() {
     if(d.q2currentAR) PLAN.q2currentAR=d.q2currentAR;
     if(d.q2arRate) PLAN.q2arRate=d.q2arRate;
     if(d.tp) PLAN.tp=d.tp;
+    if(d.bufLimits) d.bufLimits.forEach(row=>{ const b=PLAN.bufLimits.find(x=>x.id===row.id); if(b) Object.assign(b,row); });
   } catch(e) {}
 }
 
@@ -9988,12 +10018,13 @@ const HC_PREV = {};
 applyTheme();
 renderOverview();
 buildRateTabs();
-buildFloorTabs();
+if (typeof FLOOR_DEFS !== 'undefined') buildFloorTabs();
 buildBookmarklets();
 startAlertMonitor();
 initNotifications();
 initBroadcastChannel();
 loadSavedPlan();
+renderPlan();
 loadSavedAdaptaciones();
 loadSavedRoster();
 buildShiftDropdowns();
@@ -10001,6 +10032,13 @@ loadSavedIdleData();
 checkSavedEditPw();
 setInterval(pollLocalStorage, 2000);
 updateImportShiftLabel();
+</script>
+
+<!-- Local Packman proxy flag for local development -->
+<script>
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    window.PACKMAN_PROXY_URL = 'http://localhost:3002/api/packman';
+  }
 </script>
 
 <!-- Packman API Integration Scripts -->
